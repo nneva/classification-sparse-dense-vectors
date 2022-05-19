@@ -14,9 +14,10 @@ from typing import List, Set, DefaultDict, TextIO, Tuple
 from collections import defaultdict
 from collections.abc import Coroutine
 
-"""Apologies for not submitting my script with more comments, as promised. 
-    Working on correcting the error with dimensions and adding comments and docs.
-    Anyways, feel free to add/ask any additional remarks/questions as soon as I finish. 
+"""
+Apologies for not submitting my script with more comments, as promised. 
+Working on correcting the error with dimensions, and adding comments and docs.
+Anyways, feel free to add/ask any additional remarks/questions as soon as I finish. 
 """
 
 def parse_args():
@@ -117,7 +118,7 @@ class SparseVectors(object):
             :param trg_words: List of target words.
             :param basis_words: List of context words.
             :param line: Line of the input text as string.
-            :param bigrams: Dictionary to store o-occurrence counts of a target and context word.
+            :param bigrams: Dictionary to store co-occurrence counts of a target and context word.
             :param trg_unigrams: Dictionary to store frequency counts of target words.
             :param basis_unigrams: Dictionary to store frequency counts of context words.
         """
