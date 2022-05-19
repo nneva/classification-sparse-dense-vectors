@@ -18,6 +18,8 @@ from collections.abc import Coroutine
 Apologies for not submitting my script with more comments, as promised. 
 Working on correcting the error with dimensions, and adding comments and docs.
 Anyways, feel free to add/ask any additional remarks/questions as soon as I finish. 
+
+Nice BLEU implementation, btw. :)
 """
 
 def parse_args():
