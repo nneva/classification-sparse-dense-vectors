@@ -86,7 +86,7 @@ class DenseVectors:
         """
         Train word embeddings.
         :param corpus_file: One of five batches of the input text.
-        :param b_file: Text file containing context words.
+        :param t_file: Text file containing target words.
         :return: Trained word embeddings (vectors) as matrix. 
         """
         # initialize a model with args: vector size, skip-gram, number of processes, window size, min. frequency of the word
@@ -104,7 +104,11 @@ class DenseVectors:
         dense_matrix = np.zeros(shape=(45, size))
         # for every target word update matrix with target word's respective vector 
         for idx_t, t_word in enumerate(self.preprocess_t(t_words)):
-            vector = wv[t_word]
+            try:
+                vector = wv[t_word]
+
+            except KeyError:
+                continue
             dense_matrix[idx_t] = vector
 
         return dense_matrix
@@ -195,7 +199,6 @@ class SparseVectors(object):
 
 
     def get_weighted_CO_matrix(self, raw_text: str) -> ArrayLike:
-        
         bigrams = defaultdict(int)
         trg_unigrams = defaultdict(int)
         basis_unigrams = defaultdict(int)
@@ -219,10 +222,10 @@ class SparseVectors(object):
 
         sparse_vector = SparseVectors()
         PPMI_matrix = sparse_vector.compute_PPMI(trg_words, basis_words, bigrams, trg_unigrams, basis_unigrams)
-
         weighted_CO_matrix = CO_matrix * PPMI_matrix
+        bias_unit = np.ones((len(weighted_CO_matrix[:, 1])), dtype="int8")
 
-        return weighted_CO_matrix
+        return np.c_[weighted_CO_matrix, bias_unit]
 
 
 class Perceptron:
@@ -241,8 +244,6 @@ class Perceptron:
     def train(self, inputs, t_words):
         iterations = 0
 
-        bias_unit = np.ones((len(inputs[:, 1])), dtype="int8")
-        input_features = np.c_[inputs, bias_unit]
         # "WAR" is mapped to 1, "PEACE" is mapped to 0.
         labels = [word.split("\t")[1].strip() for word in open(t_words).readlines()]
         desired_output = list(map(lambda x: 1 if x == 'WAR' else 0, labels))
@@ -250,7 +251,7 @@ class Perceptron:
         while True:
             iterations += 1
 
-            for idx, input_feature in enumerate(input_features):
+            for idx, input_feature in enumerate(inputs):
                 # writing interim results into the file
                 with open("input_features.txt", "a") as out:
                     out.write(str(input_feature) + "\n")
@@ -268,13 +269,11 @@ class Perceptron:
             if iterations == 45:
                 break
 
-    # check ndim!
+
     def predict(self, inputs):
         predicted = []
-        bias_unit = np.ones((len(inputs[:, 1])), dtype="int8")
-        input_features = np.c_[inputs, bias_unit]
-
-        for input_feature, weight in zip(input_features, self.weights):
+        
+        for input_feature, weight in zip(inputs, self.weights):
             # remap to "WAR" and "PEACE", needed for computing the accuracy
             p = "WAR" if np.dot(input_feature, weight) > self.threshold else "PEACE"
             predicted.append(p)
@@ -320,8 +319,8 @@ class Perceptron:
                 out_batch.write(batch)
                 out_rest.write(rest)
 
-            train_dense_vectors = dense_vectors.train("rest.txt", b_words)
-            train_dense_vectors_test = dense_vectors.train("batch.txt", b_words)
+            train_dense_vectors = dense_vectors.train("rest.txt", t_words)
+            train_dense_vectors_test = dense_vectors.train("batch.txt", t_words)
             train_dense = perceptron.train(inputs=train_dense_vectors, t_words=t_words)
             predict_dense = perceptron.predict(inputs=train_dense_vectors_test)
 
@@ -359,7 +358,7 @@ def evaluate_single(t_words, b_words, input_text):
     accuracy_single_sparce = correct_single_sparse / len(labels)
 
     dense_vectors = DenseVectors()
-    train_dense_vectors = dense_vectors.train(input_text, b_words, t_words)
+    train_dense_vectors = dense_vectors.train(input_text, t_words)
     train_dense = perceptron.train(inputs=train_dense_vectors, t_words=t_words)
     predict_dense = perceptron.predict(inputs=train_dense_vectors)
 
