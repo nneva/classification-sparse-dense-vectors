@@ -21,7 +21,7 @@ Anyways, feel free to add/ask any additional remarks/questions as soon as I fini
 """
 
 def parse_args():
-    "Parse command line arguments."
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--input-b", type=str, 
@@ -37,9 +37,10 @@ def parse_args():
 
 
 def preprocess_raw(raw_file: TextIO) -> str:
-    """Get clean text for further processing.
-        :param raw_file: Input file.
-        :return: Text as string. 
+    """
+    Get clean text for further processing.
+    :param raw_file: Input file.
+    :return: Text as string. 
     """
     # define separators for splitting the text
     sep = ["\n\n\n\nBOOK ONE: 1805\n\n", "End of the Project Gutenberg EBook of War and Peace, by Leo Tolstoy"]
@@ -57,9 +58,10 @@ class DenseVectors:
     """Class for creating dense vector representations."""
 
     def preprocess_b(self, b_words: TextIO) -> List[str]:
-        """Preprocess file with context words.
-            :param b_file: Text file containing context words.
-            :return: Context words as list of strings.
+        """
+        Preprocess file with context words.
+        :param b_file: Text file containing context words.
+        :return: Context words as list of strings.
         """
         with open(b_words, "r") as b:
             basis_words = [line.strip() for line in b]
@@ -67,9 +69,10 @@ class DenseVectors:
             return basis_words
     
     def preprocess_t(self, t_words: TextIO) -> List[str]:
-        """Preprocess file with target words.
-            :param t_file: Text file containing context words.
-            :return: Target words as list of strings.
+        """
+        Preprocess file with target words.
+        :param t_file: Text file containing target words.
+        :return: Target words as list of strings.
         """
         with open(t_words, "r") as t:
             trg_words = [line.split("\t")[0] for line in t]
@@ -77,11 +80,12 @@ class DenseVectors:
             return trg_words
 
 
-    def train(self, corpus_file: str, b_words: TextIO, t_words: TextIO) -> ArrayLike:
-        """Train word embeddings.
-            :param corpus_file: One of five batches of the input text.
-            :param b_file: Text file containing context words.
-            :return: Trained word embeddings (vectors) as matrix. 
+    def train(self, corpus_file: str, t_words: TextIO) -> ArrayLike:
+        """
+        Train word embeddings.
+        :param corpus_file: One of five batches of the input text.
+        :param b_file: Text file containing context words.
+        :return: Trained word embeddings (vectors) as matrix. 
         """
         # initialize a model with args: vector size, skip-gram, number of processes, window size, min. frequency of the word
         model = Word2Vec(vector_size=84, sg=1, workers=1, window=2, min_count=1)
@@ -114,13 +118,14 @@ class SparseVectors(object):
                     trg_unigrams: DefaultDict,
                     basis_unigrams: DefaultDict
                     ) -> Coroutine:
-        """Store frequency counts of target and context words, and co-occurrence counts of a target and context word.
-            :param trg_words: List of target words.
-            :param basis_words: List of context words.
-            :param line: Line of the input text as string.
-            :param bigrams: Dictionary to store co-occurrence counts of a target and context word.
-            :param trg_unigrams: Dictionary to store frequency counts of target words.
-            :param basis_unigrams: Dictionary to store frequency counts of context words.
+        """
+        Store frequency counts of target and context words, and co-occurrence counts of a target and context word.
+        :param trg_words: List of target words.
+        :param basis_words: List of context words.
+        :param line: Line of the input text as string.
+        :param bigrams: Dictionary to store co-occurrence counts of a target and context word.
+        :param trg_unigrams: Dictionary to store frequency counts of target words.
+        :param basis_unigrams: Dictionary to store frequency counts of context words.
         """
         while True:
             line = (yield)
@@ -140,13 +145,14 @@ class SparseVectors(object):
                     trg_unigrams: DefaultDict,
                     basis_unigrams: DefaultDict
                     ) -> ArrayLike:
-        """Compute PPMI based on probabilities of target and context words.
-            :param trg_words: List of target words.
-            :param basis_words: List of context words.
-            :param bigrams: Dictionary with co-occurrence counts of a target and context word.
-            :param trg_unigrams: Dictionary with frequency counts of target words.
-            :param basis_unigrams: Dictionary with frequency counts of context words.
-            :return: Matrix with PPMI values. 
+        """
+        Compute PPMI based on probabilities of target and context words.
+        :param trg_words: List of target words.
+        :param basis_words: List of context words.
+        :param bigrams: Dictionary with co-occurrence counts of a target and context word.
+        :param trg_unigrams: Dictionary with frequency counts of target words.
+        :param basis_unigrams: Dictionary with frequency counts of context words.
+        :return: Matrix with PPMI values. 
         """
         
         PPMI_matrix = np.zeros(shape=(len(trg_words), len(basis_words)))
