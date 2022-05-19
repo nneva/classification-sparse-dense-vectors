@@ -10,12 +10,17 @@ import re
 import math
 import gensim
 from gensim.models import KeyedVectors, Word2Vec
-from typing import List, Set, DefaultDict, TextIO
+from typing import List, Set, DefaultDict, TextIO, Tuple
 from collections import defaultdict
 from collections.abc import Coroutine
 
+"""Apologies for not submitting my script with more comments, as promised. 
+    Working on correcting the error with dimensions and adding comments and docs.
+    Anyways, feel free to add/ask any additional remarks/questions as soon as I finish. 
+"""
 
 def parse_args():
+    "Parse command line arguments."
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--input-b", type=str, 
@@ -30,8 +35,12 @@ def parse_args():
     return args
 
 
-def preprocess_raw(raw_file):
-
+def preprocess_raw(raw_file: TextIO) -> str:
+    """Get clean text for further processing.
+        :param raw_file: Input file.
+        :return: Text as string. 
+    """
+    # define separators for splitting the text
     sep = ["\n\n\n\nBOOK ONE: 1805\n\n", "End of the Project Gutenberg EBook of War and Peace, by Leo Tolstoy"]
 
     part_1 = raw_file.read().split(sep[0])
@@ -44,40 +53,58 @@ def preprocess_raw(raw_file):
 
 
 class DenseVectors:
+    """Class for creating dense vector representations."""
 
-    def preprocess(self, b_file):
+    def preprocess_b(self, b_words: TextIO) -> List[str]:
+        """Preprocess file with context words.
+            :param b_file: Text file containing context words.
+            :return: Context words as list of strings.
+        """
+        with open(b_words, "r") as b:
+            basis_words = [line.strip() for line in b]
 
-        with open(b_file, "r") as f:
-            sentences = [line.strip() for line in f]
+            return basis_words
+    
+    def preprocess_t(self, t_words: TextIO) -> List[str]:
+        """Preprocess file with target words.
+            :param t_file: Text file containing context words.
+            :return: Target words as list of strings.
+        """
+        with open(t_words, "r") as t:
+            trg_words = [line.split("\t")[0] for line in t]
+        
+            return trg_words
 
-            return sentences
 
-
-    def train(self, corpus_file, b_file):
-
-        model = Word2Vec(vector_size=46, sg=1, workers=1, window=2, min_count=1)
+    def train(self, corpus_file: str, b_words: TextIO, t_words: TextIO) -> ArrayLike:
+        """Train word embeddings.
+            :param corpus_file: One of five batches of the input text.
+            :param b_file: Text file containing context words.
+            :return: Trained word embeddings (vectors) as matrix. 
+        """
+        # initialize a model with args: vector size, skip-gram, number of processes, window size, min. frequency of the word
+        model = Word2Vec(vector_size=84, sg=1, workers=1, window=2, min_count=1)
         model.build_vocab(corpus_file=corpus_file)
         model.train(corpus_file=corpus_file, epochs=60, total_words=model.corpus_count)
+        # store words as keys and vectors as their respective values
         word_vectors = model.wv
         word_vectors.save("word2vec.wordvectors")
+        # store vector size for matrix initialization
         size = model.vector_size
         del model
-        wv = KeyedVectors.load("word2vec.wordvectors", mmap='r')
-        dense_matrix = np.zeros(shape=(size, len(self.preprocess(b_file))))
+        wv = KeyedVectors.load("word2vec.wordvectors", mmap="r")
+        # initialize zero-matrix of size 45 x 84
+        dense_matrix = np.zeros(shape=(45, size))
+        # for every target word update matrix with target word's respective vector 
+        for idx_t, t_word in enumerate(self.preprocess_t(t_words)):
+            vector = wv[t_word]
+            dense_matrix[idx_t] = vector
 
-        for idx, sent in enumerate(self.preprocess(b_file)):
-
-            try:
-                vector = wv[sent]
-                dense_matrix[:, idx] = vector
-
-            except KeyError:
-                continue
-        
         return dense_matrix
 
 
 class SparseVectors(object):
+    """Class for creating sparse vector representations."""
 
     def get_counts(trg_words: List[str],
                     basis_words: List[str],
@@ -86,7 +113,14 @@ class SparseVectors(object):
                     trg_unigrams: DefaultDict,
                     basis_unigrams: DefaultDict
                     ) -> Coroutine:
-        
+        """Store frequency counts of target and context words, and co-occurrence counts of a target and context word.
+            :param trg_words: List of target words.
+            :param basis_words: List of context words.
+            :param line: Line of the input text as string.
+            :param bigrams: Dictionary to store o-occurrence counts of a target and context word.
+            :param trg_unigrams: Dictionary to store frequency counts of target words.
+            :param basis_unigrams: Dictionary to store frequency counts of context words.
+        """
         while True:
             line = (yield)
             for trg_word in trg_words:
@@ -105,6 +139,14 @@ class SparseVectors(object):
                     trg_unigrams: DefaultDict,
                     basis_unigrams: DefaultDict
                     ) -> ArrayLike:
+        """Compute PPMI based on probabilities of target and context words.
+            :param trg_words: List of target words.
+            :param basis_words: List of context words.
+            :param bigrams: Dictionary with co-occurrence counts of a target and context word.
+            :param trg_unigrams: Dictionary with frequency counts of target words.
+            :param basis_unigrams: Dictionary with frequency counts of context words.
+            :return: Matrix with PPMI values. 
+        """
         
         PPMI_matrix = np.zeros(shape=(len(trg_words), len(basis_words)))
 
@@ -114,7 +156,8 @@ class SparseVectors(object):
                 prob_bigram = count / sum(bigrams.values())
                 prob_trg_word = trg_unigrams[trg_word] / sum(trg_unigrams.values())
                 prob_basis_word = basis_unigrams[basis_word] / sum(basis_unigrams.values())
-                PPMI = max(math.log2(prob_bigram / (prob_trg_word * prob_basis_word)), 0) if trg_unigrams[trg_word] and basis_unigrams[basis_word] and prob_bigram != 0 else 0
+                PPMI = max(math.log2(prob_bigram / (prob_trg_word * prob_basis_word)), 0) if trg_unigrams[trg_word] \
+                    and basis_unigrams[basis_word] and prob_bigram != 0 else 0
                 PPMI_matrix[idx_trg][idx_basis] = PPMI
 
         return PPMI_matrix
@@ -133,7 +176,9 @@ class SparseVectors(object):
                     for word in sent:
                         if word == trg_word:
                             idx = sent.index(word)
-                            window = [sent[idx - 2], sent[idx - 1], sent[idx], sent[idx + 1], sent[idx + 2]] if idx < len(sent) - 2 and idx >= 2 else ''
+                            #window size equal to 5
+                            window = [sent[idx - 2], sent[idx - 1], sent[idx], sent[idx + 1], sent[idx + 2]] \
+                                if idx < len(sent) - 2 and idx >= 2 else ''
                             for word in window:
                                 if word in set(basis_words):
                                     idx_basis = basis_words.index(word)
@@ -155,7 +200,9 @@ class SparseVectors(object):
         
         for line in raw_text.splitlines():
             counts = SparseVectors.get_counts(trg_words, basis_words, line, bigrams, trg_unigrams, basis_unigrams)
+            # get element from the iterator
             next(counts)
+            # send element to coroutine
             counts.send(line)
             co_occurrence = SparseVectors.get_cooccurrence_matrix(trg_words, basis_words, line, CO_matrix)
             next(co_occurrence)
@@ -198,7 +245,7 @@ class Perceptron:
                 # writing interim results into the file
                 with open("input_features.txt", "a") as out:
                     out.write(str(input_feature) + "\n")
-                weights =  [0.0] * (len(input_feature)) 
+                weights =  [0.0] * len(input_feature) 
                 result = Perceptron.sigmoid((np.dot(input_feature, weights)))
                 error = desired_output[idx] - result
 
@@ -212,7 +259,7 @@ class Perceptron:
             if iterations == 45:
                 break
 
-
+    # check ndim!
     def predict(self, inputs):
         predicted = []
         bias_unit = np.ones((len(inputs[:, 1])), dtype="int8")
@@ -303,7 +350,7 @@ def evaluate_single(t_words, b_words, input_text):
     accuracy_single_sparce = correct_single_sparse / len(labels)
 
     dense_vectors = DenseVectors()
-    train_dense_vectors = dense_vectors.train(input_text, b_words)
+    train_dense_vectors = dense_vectors.train(input_text, b_words, t_words)
     train_dense = perceptron.train(inputs=train_dense_vectors, t_words=t_words)
     predict_dense = perceptron.predict(inputs=train_dense_vectors)
 
