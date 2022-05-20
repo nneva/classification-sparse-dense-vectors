@@ -4,23 +4,24 @@
 
 import argparse
 from argparse import ArgumentParser
+from collections import defaultdict
+from collections.abc import Coroutine
+import gensim
+from gensim.models import KeyedVectors, Word2Vec
+import math
 import numpy as np
 from numpy.typing import ArrayLike
 import re
-import math
-import gensim
-from gensim.models import KeyedVectors, Word2Vec
-from typing import List, Set, DefaultDict, TextIO, Tuple
-from collections import defaultdict
-from collections.abc import Coroutine
+from typing import List, Set, DefaultDict, TextIO
+
+
 
 """
-Apologies for not submitting my script with more comments, as promised. 
-Working on correcting the error with dimensions, and adding comments and docs.
-Anyways, feel free to add/ask any additional remarks/questions as soon as I finish. 
+Apologies for not submitting my script properly documented, as promised. 
 
 Nice BLEU implementation, btw. :)
 """
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -59,30 +60,29 @@ def preprocess_raw(raw_file: TextIO) -> str:
 class DenseVectors:
     """Class for creating dense vector representations."""
 
-    def preprocess_b(self, b_words: TextIO) -> List[str]:
+    def preprocess_b(self, b_words: str) -> List[str]:
         """
         Preprocess file with context words.
         :param b_file: Text file containing context words.
         :return: Context words as list of strings.
         """
-        with open(b_words, "r") as b:
-            basis_words = [line.strip() for line in b]
+        basis_words = [line.strip() for line in b_words]
 
-            return basis_words
+        return basis_words
     
-    def preprocess_t(self, t_words: TextIO) -> List[str]:
+
+    def preprocess_t(self, t_words: str) -> List[str]:
         """
         Preprocess file with target words.
         :param t_file: Text file containing target words.
         :return: Target words as list of strings.
         """
-        with open(t_words, "r") as t:
-            trg_words = [line.split("\t")[0] for line in t]
+        trg_words = [line.split("\t")[0] for line in t_words]
         
-            return trg_words
+        return trg_words
 
 
-    def train(self, corpus_file: str, t_words: TextIO) -> ArrayLike:
+    def train(self, corpus_file: str, t_words: str) -> ArrayLike:
         """
         Train word embeddings.
         :param corpus_file: One of five batches of the input text.
@@ -166,8 +166,11 @@ class SparseVectors(object):
         for idx_trg, trg_word in enumerate(trg_words):
             for idx_basis, basis_word in enumerate(basis_words):
                 count = bigrams[trg_word + ' ' + basis_word]
+                # compute probability that a target and context co-occur 
                 prob_bigram = count / sum(bigrams.values())
+                # compute probability of a target word 
                 prob_trg_word = trg_unigrams[trg_word] / sum(trg_unigrams.values())
+                # compute probability of a context word
                 prob_basis_word = basis_unigrams[basis_word] / sum(basis_unigrams.values())
                 PPMI = max(math.log2(prob_bigram / (prob_trg_word * prob_basis_word)), 0) if trg_unigrams[trg_word] \
                     and basis_unigrams[basis_word] and prob_bigram != 0 else 0
@@ -181,6 +184,13 @@ class SparseVectors(object):
                                 line: str,
                                 CO_matrix: ArrayLike
                                 ) -> Coroutine:
+        """
+        Create matrix with co-occurrence counts of a target word and 4 sourrounding context words.
+        :param trg_words: List of target words.
+        :param basis_words: List of context words.
+        :param line: Line of the input text as string. 
+        :param CO_matrix: Matrix to store co-occurrence counts.
+        """
         while True:
             line = (yield)
             for idx_trg, trg_word in enumerate(trg_words):
@@ -189,7 +199,7 @@ class SparseVectors(object):
                     for word in sent:
                         if word == trg_word:
                             idx = sent.index(word)
-                            #window size equal to 5
+                            # window size equal to 5
                             window = [sent[idx - 2], sent[idx - 1], sent[idx], sent[idx + 1], sent[idx + 2]] \
                                 if idx < len(sent) - 2 and idx >= 2 else ''
                             for word in window:
@@ -199,6 +209,12 @@ class SparseVectors(object):
 
 
     def get_weighted_CO_matrix(self, raw_text: str) -> ArrayLike:
+        """
+        Create co-occurrence counts of a target word and 4 sourrounding context words matrix,
+        weighted by respective PPMI values.
+        :param raw_text: Input text to extract counts and values from.
+        :return: PPMI weighted co-occurrence matrix.
+        """
         bigrams = defaultdict(int)
         trg_unigrams = defaultdict(int)
         basis_unigrams = defaultdict(int)
@@ -212,23 +228,29 @@ class SparseVectors(object):
         
         for line in raw_text.splitlines():
             counts = SparseVectors.get_counts(trg_words, basis_words, line, bigrams, trg_unigrams, basis_unigrams)
-            # get element from the iterator
+            # get next count from the iterator
             next(counts)
-            # send element to coroutine
+            # send count to coroutine
             counts.send(line)
             co_occurrence = SparseVectors.get_cooccurrence_matrix(trg_words, basis_words, line, CO_matrix)
+            # get next co-occurrence count from the iterator
             next(co_occurrence)
+            # send co-occurrence count to coroutine
             co_occurrence.send(line)
 
         sparse_vector = SparseVectors()
+
         PPMI_matrix = sparse_vector.compute_PPMI(trg_words, basis_words, bigrams, trg_unigrams, basis_unigrams)
+        # compute final (weighted) co-occurrence matrix
         weighted_CO_matrix = CO_matrix * PPMI_matrix
+        # bias unit to add to the final matrix
         bias_unit = np.ones((len(weighted_CO_matrix[:, 1])), dtype="int8")
 
         return np.c_[weighted_CO_matrix, bias_unit]
 
 
 class Perceptron:
+    """Class for classification of word vectors."""
 
     def __init__(self, threshold = 0.5, learning_rate = 0.2):
         self.learning_rate = learning_rate
@@ -241,7 +263,12 @@ class Perceptron:
         return 1 / (1 + np.exp(-2 * x))
 
         
-    def train(self, inputs, t_words):
+    def train(self, inputs: ArrayLike, t_words: str):
+        """
+        Compute and store parameters (weights) of target words.
+        :param inputs: Matrix consisting of sparse/dense word vectors.
+        :param t_words: Target words.  
+        """
         iterations = 0
 
         # "WAR" is mapped to 1, "PEACE" is mapped to 0.
@@ -257,10 +284,11 @@ class Perceptron:
                     out.write(str(input_feature) + "\n")
                 weights =  [0.0] * len(input_feature) 
                 result = Perceptron.sigmoid((np.dot(input_feature, weights)))
+                # compute difference between true label and predicted label
                 error = desired_output[idx] - result
 
                 if abs(error) > 0.1:
-
+                    # compute single parameter based on difference between true value and predicted value
                     for idx, value in enumerate(input_feature):
                         weights[idx] += self.learning_rate * error * value
 
@@ -270,32 +298,45 @@ class Perceptron:
                 break
 
 
-    def predict(self, inputs):
+    def predict(self, inputs: ArrayLike) -> List[str]:
+        """
+        Predict label of a target word using sparse/dense vectors and its respective parameters.
+        :param inputs: Matrix consisting of sparse/dense word vectors.
+        :return: Predicted label for each target word as list. 
+        """
         predicted = []
         
         for input_feature, weight in zip(inputs, self.weights):
-            # remap to "WAR" and "PEACE", needed for computing the accuracy
+            # remap to "WAR" and "PEACE", needed for computing of the accuracy
             p = "WAR" if np.dot(input_feature, weight) > self.threshold else "PEACE"
             predicted.append(p)
 
         return predicted
 
 
-    def evaluate_cross_val(self, t_words, b_words, input_text):
+    def evaluate_cross_val(self, t_words: str, b_words: str, input_text: str):
+        """
+        Perform 5 fold cross-validation on the input text.
+        :param t_words: Target words.
+        :param b_words: Context words.
+        :param input_text: Text from the input file.
+        """
         raw_text = preprocess_raw(open(input_text))
         batch_size = len(raw_text) // 5
         batches = []
 
+        #initialize objects
         sparse_vectors = SparseVectors()
         dense_vectors = DenseVectors()
         perceptron = Perceptron()
 
         labels = [word.split("\t")[1].strip() for word in open(t_words).readlines()]
+
         total_sparse = 0
         total_dense = 0
 
         for idx in range(5):
-            # split initial data set into batches for cross-validation
+            # split input text into test batch and rest of batches for cross-validation
             batch = raw_text[idx * batch_size : (idx + 1) * batch_size]
             rest = raw_text[0: idx * batch_size] + raw_text[(idx + 1) * batch_size :]
             
@@ -314,11 +355,12 @@ class Perceptron:
             total_sparse += accuracy
             print(f"Accuracy of batch {idx + 1} is {accuracy} for sparse vectors.")
 
-            # compute accuracy for dense vectors
+            # write batches into file as input to gensim
             with open("batch.txt", "w") as out_batch, open("rest.txt", "w") as out_rest:
                 out_batch.write(batch)
                 out_rest.write(rest)
 
+            # compute accuracy for dense vectors
             train_dense_vectors = dense_vectors.train("rest.txt", t_words)
             train_dense_vectors_test = dense_vectors.train("batch.txt", t_words)
             train_dense = perceptron.train(inputs=train_dense_vectors, t_words=t_words)
@@ -338,13 +380,22 @@ class Perceptron:
         print(f"Average accuracy is {total_dense / 5} for dense vectors.")    
 
 
-def evaluate_single(t_words, b_words, input_text):
+def evaluate_single(t_words: str, b_words: str, input_text: str):
+    """
+    Perform evaluation of the output on the input text.
+    :param t_words: Target words.
+    :param b_words: Context words.
+    :param input_text: Text from the input file.
+    """
     labels = [word.split("\t")[1].strip() for word in open(t_words).readlines()]
-
+    # initialize objects
     perceptron = Perceptron()
-
     sparse_vectors = SparseVectors()
+    dense_vectors = DenseVectors()
+
     raw_text = preprocess_raw(open(input_text))
+
+    # evaluate sparse
     weighted_CO_matrix = sparse_vectors.get_weighted_CO_matrix(raw_text) 
     train_sparse = perceptron.train(inputs=weighted_CO_matrix, t_words=t_words)
     predict_sparse = perceptron.predict(inputs=weighted_CO_matrix)
@@ -357,7 +408,7 @@ def evaluate_single(t_words, b_words, input_text):
 
     accuracy_single_sparce = correct_single_sparse / len(labels)
 
-    dense_vectors = DenseVectors()
+    # evaluate dense
     train_dense_vectors = dense_vectors.train(input_text, t_words)
     train_dense = perceptron.train(inputs=train_dense_vectors, t_words=t_words)
     predict_dense = perceptron.predict(inputs=train_dense_vectors)
