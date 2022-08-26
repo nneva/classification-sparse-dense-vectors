@@ -15,14 +15,6 @@ import re
 from typing import List, Set, DefaultDict, TextIO
 
 
-
-"""
-Apologies for not submitting my script properly documented, as promised. 
-
-Nice BLEU implementation, btw. :)
-"""
-
-
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
@@ -66,9 +58,7 @@ class DenseVectors:
         :param b_file: Text file containing context words.
         :return: Context words as list of strings.
         """
-        basis_words = [line.strip() for line in b_words]
-
-        return basis_words
+        return [line.strip() for line in b_words]
     
 
     def preprocess_t(self, t_words: str) -> List[str]:
@@ -77,9 +67,7 @@ class DenseVectors:
         :param t_file: Text file containing target words.
         :return: Target words as list of strings.
         """
-        trg_words = [line.split("\t")[0] for line in t_words]
-        
-        return trg_words
+        return [line.split("\t")[0] for line in t_words]
 
 
     def train(self, corpus_file: str, t_words: str) -> ArrayLike:
@@ -89,7 +77,7 @@ class DenseVectors:
         :param t_file: Text file containing target words.
         :return: Trained word embeddings (vectors) as matrix. 
         """
-        # initialize a model with args: vector size, skip-gram, number of processes, window size, min. frequency of the word
+        # initialize model with args: vector size, skip-gram, number of processes, window size, min. frequency of the word
         model = Word2Vec(vector_size=84, sg=1, workers=1, window=2, min_count=1)
         model.build_vocab(corpus_file=corpus_file)
         model.train(corpus_file=corpus_file, epochs=60, total_words=model.corpus_count)
@@ -215,15 +203,12 @@ class SparseVectors(object):
         :param raw_text: Input text to extract counts and values from.
         :return: PPMI weighted co-occurrence matrix.
         """
-        bigrams = defaultdict(int)
-        trg_unigrams = defaultdict(int)
-        basis_unigrams = defaultdict(int)
-
+        bigrams, trg_unigrams, basis_unigrams = defaultdict(int)
 
         with open("data/pa3_B.txt", "r") as b_words, open("data/pa3_T.txt", "r") as t_words:
             basis_words = [line.strip() for line in b_words.readlines()]
             trg_words = [line.split("\t")[0] for line in t_words.readlines()]  
-
+        # initialize empty co-occurrrence matrix
         CO_matrix = np.ones(shape=(len(trg_words), len(basis_words)))
         
         for line in raw_text.splitlines():
@@ -232,6 +217,7 @@ class SparseVectors(object):
             next(counts)
             # send count to coroutine
             counts.send(line)
+            # populate co-occurrence matrix
             co_occurrence = SparseVectors.get_cooccurrence_matrix(trg_words, basis_words, line, CO_matrix)
             # get next co-occurrence count from the iterator
             next(co_occurrence)
@@ -279,9 +265,6 @@ class Perceptron:
             iterations += 1
 
             for idx, input_feature in enumerate(inputs):
-                # writing interim results into the file
-                with open("input_features.txt", "a") as out:
-                    out.write(str(input_feature) + "\n")
                 weights =  [0.0] * len(input_feature) 
                 result = Perceptron.sigmoid((np.dot(input_feature, weights)))
                 # compute difference between true label and predicted label
