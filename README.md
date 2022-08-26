@@ -38,6 +38,8 @@ During execution this script is going to produce several files.
 
 Table **results.txt** was made manually.
 
+![Classification-with-sparse-and-dense-vectors's Stats](https://github-readme-stats.vercel.app/api/top-langs/?username=nneva&theme=blue-green)
+
 
 
 
