@@ -1,6 +1,4 @@
 #/usr/bin/python3
-# pa3.py
-# author: Nevena Nikolic
 
 import argparse
 from argparse import ArgumentParser
@@ -161,7 +159,7 @@ class SparseVectors(object):
                 # compute probability of a context word
                 prob_basis_word = basis_unigrams[basis_word] / sum(basis_unigrams.values())
                 PPMI = max(math.log2(prob_bigram / (prob_trg_word * prob_basis_word)), 0) if trg_unigrams[trg_word] \
-                    and basis_unigrams[basis_word] and prob_bigram != 0 else 0
+                    and basis_unigrams[basis_word] and prob_bigram > 0 else 0
                 PPMI_matrix[idx_trg][idx_basis] = PPMI
 
         return PPMI_matrix
@@ -203,9 +201,9 @@ class SparseVectors(object):
         :param raw_text: Input text to extract counts and values from.
         :return: PPMI weighted co-occurrence matrix.
         """
-        bigrams, trg_unigrams, basis_unigrams = defaultdict(int)
+        bigrams, trg_unigrams, basis_unigrams = defaultdict(int), defaultdict(int), defaultdict(int)
 
-        with open("data/pa3_B.txt", "r") as b_words, open("data/pa3_T.txt", "r") as t_words:
+        with open("data/B.txt", "r") as b_words, open("data/T.txt", "r") as t_words:
             basis_words = [line.strip() for line in b_words.readlines()]
             trg_words = [line.split("\t")[0] for line in t_words.readlines()]  
         # initialize empty co-occurrrence matrix
@@ -267,11 +265,11 @@ class Perceptron:
             for idx, input_feature in enumerate(inputs):
                 weights =  [0.0] * len(input_feature) 
                 result = Perceptron.sigmoid((np.dot(input_feature, weights)))
-                # compute difference between true label and predicted label
+                # calculate the error (difference between true label and predicted label)
                 error = desired_output[idx] - result
 
                 if abs(error) > 0.1:
-                    # compute single parameter based on difference between true value and predicted value
+                    # update the weights with gradient descent
                     for idx, value in enumerate(input_feature):
                         weights[idx] += self.learning_rate * error * value
 
@@ -336,7 +334,7 @@ class Perceptron:
 
             accuracy = correct / len(labels)
             total_sparse += accuracy
-            print(f"Accuracy of batch {idx + 1} is {accuracy} for sparse vectors.")
+            print(f"Accuracy of batch {idx + 1} is {round(accuracy, 3)} for sparse vectors.")
 
             # write batches into file as input to gensim
             with open("batch.txt", "w") as out_batch, open("rest.txt", "w") as out_rest:
@@ -356,11 +354,11 @@ class Perceptron:
 
             accuracy = correct_dense / len(labels)
             total_dense += accuracy
-            print(f"Accuracy of batch {idx + 1} is {accuracy} for dense vectors.")
+            print(f"Accuracy of batch {idx + 1} is {round(accuracy, 3)} for dense vectors.")
 
             
-        print(f"Average accuracy is {total_sparse / 5} for sparse vectors.")
-        print(f"Average accuracy is {total_dense / 5} for dense vectors.")    
+        print(f"Average accuracy is {round(total_sparse / 5, 3)} for sparse vectors.")
+        print(f"Average accuracy is {round(total_dense / 5, 3)} for dense vectors.")    
 
 
 def evaluate_single(t_words: str, b_words: str, input_text: str):
@@ -404,8 +402,8 @@ def evaluate_single(t_words: str, b_words: str, input_text: str):
 
     accuracy_single_dense = correct_single_dense / len(labels)
 
-    print(f"Single accuracy is {accuracy_single_sparce} for sparse vectors.")
-    print(f"Single accuracy is {accuracy_single_dense} for dense vectors.")
+    print(f"Single accuracy is {round(accuracy_single_sparce, 3)} for sparse vectors.")
+    print(f"Single accuracy is {round(accuracy_single_dense, 3)} for dense vectors.")
 
 
 def main():
