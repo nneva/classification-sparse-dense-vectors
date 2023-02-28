@@ -1,47 +1,28 @@
-`program call`
+# Perceptron Classifier with Sparse and Dense Vectors
+This repository contains an implementation of a Perceptron for classification of sparse and dense vectors.
 
-        python PA3.py --input-b data/pa3_B.txt --input-t data/pa3_T.txt --input-text data/pa3_input_text.txt
+# What is a Perceptron?
+A Perceptron is a binary classifier that is used in supervised learning. It is a type of a simple neural network that can be used to classify input data into one of two categories. The algorithm learns a linear function that separates the two classes. The learning process involves adjusting the weights of the input variables until the classification error is minimized.
 
-
-`window size`
-
-        Window size is 5. Decision was made empirically. I was satisfied with how vectors looked like in both settings, sparse and dense. 
-        On the other hand, since Tolstoy tends to have longer sentences, the window size could also be larger, but definitely not smaller than 5.
-
-`preprocessing`
-
-        I have decided to stick with the minimal preprocessing steps with not perfect results. Using a proper tokenizer would be nice, but it would affect execution time a lot, and thus outweigh the benefits of itself.
-
-`comparison`
-
-Accuracy is better in a sparse than in a dense setting for all categories due to the following facts (ordered by importance).
-
-        Association and similarity: For this task it is simply more appropriate to use PMI since it is an association metric. Word2Vec is a similarity metric. Two words that are associated with each other, aren't always similar, when it comes to their meaning. E.g Peter : war
-
-        Rare words: Whereas PMI is favorable towards those, Word2Vec SkipGram is not. Moreover, rare words are deleted when context window is created.
-
-        Closer words: Word2Vec assigns more weight to the closer words, which is not the case with PMI. It treats all co-occurrences the same.
-
-        
-
-`further remarks`
-
-During execution this script is going to produce several files.
-
-        input_features.txt: Since I was asked to print out those, I've decided to write them into the file for better readability. It's not perfect, but definitely more readable than in the terminal, at least in the code editor that I am using.
-
-        batch.txt & rest.txt: These files are necessary as the input for gensim. If I had used option for file iterator, the training would be much slower, so I had to pass .txt files, when doing cross-validation.
-
-        dense_vectors.txt: This file was made somewhere in the middle of developing, I've deleted that line, however since I have already made the file, I submit that one, too. This file containes 80 instead of 83 vectors, due to absence of some names, such as "Fouché" from the input text. In the final matrix with dense vectors, absent words are substituted with zero-vectors.
-
-        word2vec.wordvectors-file: Created by gensim and needed for further processing, since I am loading vectors from this file and deleting the model after the initial training.
-
-Table **results.txt** was made manually.
-
-![Classification-with-sparse-and-dense-vectors's Stats](https://github-readme-stats.vercel.app/api/top-langs/?username=nneva&theme=blue-green)
+# Implementation Details
+The Perceptron in this repository is implemented in Python using the NumPy. It takes in either a dense vector or a sparse vector as input, and uses stochastic gradient descent to learn the weights of the input variables.
 
 
+The sparse vector are obtained by weighting co-occurrence of two words with Positive Pointwise Mutual Information (PPMI) score, which is a measure of the association between two events (in this application: two words). PMI itself measures the log-likelihod of the joint probabiliy of two words occurring together to the product of their individual probabilities according to the following formula:
 
+PMI $(w_1, w_2) = \log_2(\frac{P(w_1,w_2)}{P(w_1) \cdot P(w_2)})$
 
+In this implementation only positive values of the PMI score are considered and all negative PMI values are set to 0.
 
+The dense vector representations are word embeddings obtained by training Word2Vec with [Gensim](https://radimrehurek.com/gensim/models/word2vec.html).
 
+The model performance is evaluated with 5-fold cross-validation. The accuracy per batch will be printed out with the following command:
+
+        python classifier.py --input-b data/B.txt --input-t data/T.txt --input-text data/input_text.txt
+
+# How to use Perceptron 
+- Clone the repository to your local machine
+- Install the necessary dependencies by running pip install -r requirements.txt
+- Import the Perceptron Classifier from perceptron.py and create an instance of the classifier.
+- Train the classifier on your training data by calling the `train()` method and passing in your training data and labels.
+- Predict the labels of your test data by calling the `predict()` method and passing in your test data.
