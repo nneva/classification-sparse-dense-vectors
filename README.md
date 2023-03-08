@@ -23,6 +23,6 @@ The model performance is evaluated with 5-fold cross-validation. The accuracy pe
 # How to use Perceptron 
 - Clone the repository to your local machine
 - Install the necessary dependencies by running pip install -r requirements.txt
-- Import the Perceptron Classifier from perceptron.py and create an instance of the classifier.
-- Train the classifier on your training data by calling the `train()` method and passing in your training data and labels.
+- Import the Perceptron Classifier from classifier.py and create an instance of the classifier.
+- Train the classifier on provided training data (can be found in directory `data`) by calling the `train()` method and passing training data and labels (can also be found in directory `data`: B.txt & T.txt).
 - Predict the labels of your test data by calling the `predict()` method and passing in your test data.
